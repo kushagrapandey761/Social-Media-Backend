@@ -6,6 +6,7 @@ const { RedisStore } = require("connect-redis");
 const authMiddleware = require("./middleware/authMiddleware");
 const uploadMedia = require("./middleware/upload.middleware");
 const { User, Post } = require("./db");
+const cors = require("cors");
 
 const app = express();
 
@@ -22,6 +23,13 @@ app.use(
   }),
 );
 
+app.use(
+  cors({
+    origin: "http://localhost:3000", // frontend URL
+    credentials: true, // VERY IMPORTANT for sessions
+  }),
+);
+
 app.post("/login", async (req, res) => {
   const user = await User.findOne({ email: req.body.email });
   if (!user) return res.status(401).send("Invalid credentials");
@@ -33,7 +41,7 @@ app.post("/login", async (req, res) => {
 
   req.session.user = {
     id: user._id,
-    name: user.name,
+    username: user.username,
   };
 
   // Save session to Redis so it persists across requests
@@ -71,19 +79,23 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
     // 3️⃣ Store in Redis (Expire in 60 seconds)
     await redisClient.setEx(`user:${userId}`, 60, JSON.stringify(user));
 
-    res.json(user);
+    res.json({ username: user.username, email: user.email, userAvatar: user.userAvatar });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/signin", async (req, res) => {
-  const { name, email, password } = req.body;
+app.post("/signup", async (req, res) => {
+  const { username, email, password } = req.body;
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ message: "Email already in use" });
+  }
   
   // Hash password before saving
-  const hashedPassword = await bcryptjs.hash(password, process.env.SALT_ROUNDS);
+  const hashedPassword = await bcryptjs.hash(password, parseInt(process.env.SALT_ROUNDS));
   
-  const user = new User({ name, email, password: hashedPassword });
+  const user = new User({ username, email, password: hashedPassword, userAvatar: "" });
   await user.save();
   res.json({ message: "User created" });
 });
@@ -117,21 +129,54 @@ app.get("/post/:postid", authMiddleware, async (req, res) => {
 });
 
 app.post("/post", authMiddleware, uploadMedia("files"), async (req, res) => {
-  const { title, content, media } = req.body;
+  const { content, media } = req.body;
   const authorId = req.session.user.id;
+  const user = await User.findById(authorId);
   const post = new Post({
-    title,
     content,
     media,
     authorId,
+    userName: user.username,
+    userAvatar: user.userAvatar,
     createdAt: new Date(),
   });
   await post.save();
   res.json({ post });
 });
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+app.post("/post/:postid/like", authMiddleware, async (req, res) => {
+  const postId = req.params.postid;
+  try {
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    post.likes += 1; // Increment likes
+    await post.save();
+    res.json({ message: "Post liked", likes: post.likes });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/post/:postid/comment", authMiddleware, async (req, res) => {
+  const postId = req.params.postid;
+  const { text } = req.body;
+  try {
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    post.comments.push({ text }); // Add comment
+    await post.save();
+    res.json({ message: "Comment added", comments: post.comments });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(3001, () => {
+  console.log("Server running on port 3001");
 });
 
 // Component	      Role
