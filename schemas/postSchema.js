@@ -7,6 +7,7 @@ const postSchema = new mongoose.Schema({
   userAvatar: String,
   likes: { type: Number, default: 0 },
   comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
+  likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Track users who liked the post
   createdAt: Date,
 });
 

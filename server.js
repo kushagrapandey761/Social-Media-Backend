@@ -101,7 +101,9 @@ app.post("/signup", async (req, res) => {
 });
 
 app.get("/posts", authMiddleware, async (req, res) => {
-  const posts = await Post.find();
+  const userId = req.session.user.id;
+   // Only return posts not created by the user
+  const posts = await Post.find({ authorId: { $ne: userId } });
   res.json(posts);
 });
 
@@ -144,16 +146,27 @@ app.post("/post", authMiddleware, uploadMedia("files"), async (req, res) => {
   res.json({ post });
 });
 
-app.post("/post/:postid/like", authMiddleware, async (req, res) => {
+app.post("/post/:postid/toggleLike", authMiddleware, async (req, res) => {
   const postId = req.params.postid;
+  const userId = req.session.user.id;
   try {
     const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
-    post.likes += 1; // Increment likes
-    await post.save();
-    res.json({ message: "Post liked", likes: post.likes });
+      // Check if user already liked the post
+    if (post.likedBy.includes(userId)) {
+      post.likes -= 1;
+      post.likedBy.pull(userId); // Remove user from likedBy
+      await post.save();
+      return res.json({ message: "Post unliked", likes: post.likes });
+    }
+    else {
+      post.likes += 1; // Increment likes
+      post.likedBy.push(userId); // Track who liked the post
+      await post.save();
+      res.json({ message: "Post liked", likes: post.likes });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -174,6 +187,18 @@ app.post("/post/:postid/comment", authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.get("/me", authMiddleware, async (req, res) => {
+  const userId = req.session.user.id;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ _id: user._id, username: user.username, email: user.email, userAvatar: user.userAvatar, likedPosts: user.likedPosts });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }});
 
 app.listen(3001, () => {
   console.log("Server running on port 3001");
