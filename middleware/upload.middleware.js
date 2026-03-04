@@ -68,4 +68,73 @@ const uploadMedia = (fieldName, maxCount = 5, folderName = "posts") => [
   },
 ];
 
+const uploadProfileMedia = () => [
+  upload.fields([
+    { name: 'userAvatar', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 }
+  ]),
+  
+  async (req, res, next) => {
+    try {
+      const uploadedMedia = {};
+      
+      // Handle userAvatar
+      if (req.files?.userAvatar && req.files.userAvatar.length > 0) {
+        const file = req.files.userAvatar[0];
+        await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'userAvatar',
+              resource_type: 'auto',
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else {
+                uploadedMedia.userAvatar = {
+                  url: result.secure_url,
+                  type: result.resource_type,
+                  publicId: result.public_id,
+                };
+                resolve();
+              }
+            },
+          );
+          stream.end(file.buffer);
+        });
+      }
+      
+      // Handle coverImage
+      if (req.files?.coverImage && req.files.coverImage.length > 0) {
+        const file = req.files.coverImage[0];
+        await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'coverImage',
+              resource_type: 'auto',
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else {
+                uploadedMedia.coverImage = {
+                  url: result.secure_url,
+                  type: result.resource_type,
+                  publicId: result.public_id,
+                };
+                resolve();
+              }
+            },
+          );
+          stream.end(file.buffer);
+        });
+      }
+      
+      req.body.uploadedMedia = uploadedMedia;
+      next();
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+];
+
 module.exports = uploadMedia;
+module.exports.uploadProfileMedia = uploadProfileMedia;

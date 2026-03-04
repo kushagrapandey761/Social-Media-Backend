@@ -5,7 +5,8 @@ const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const authMiddleware = require("./middleware/authMiddleware");
 const uploadMedia = require("./middleware/upload.middleware");
-const { User, Post } = require("./db");
+const { uploadProfileMedia } = require("./middleware/upload.middleware");
+const { User, Post, Follow } = require("./db");
 const cors = require("cors");
 
 const app = express();
@@ -52,8 +53,20 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/users", authMiddleware, async (req, res) => {
-  const user = await User.find();
-  res.json(user);
+  const users = await User.find({ _id: { $ne: currentUserId } });
+
+  const following = await Follow.find({
+    followerId: currentUserId,
+  }).select("followingId");
+
+  const followingIds = following.map((f) => f.followingId.toString());
+
+  const result = users.map((user) => ({
+    ...user.toObject(),
+    isFollowing: followingIds.includes(user._id.toString()),
+  }));
+
+  res.json(result);
 });
 
 app.get("/user/:id", authMiddleware, async (req, res) => {
@@ -86,16 +99,20 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
 });
 
 app.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
-  const existingUser = await User.findOne({ email });
+  const { name, username, email, password } = req.body;
+  let existingUser = await User.findOne({ email, username });
   if (existingUser) {
     return res.status(400).json({ message: "Email already in use" });
+  }
+  existingUser = await User.findOne({ username });
+  if (existingUser) {
+    return res.status(400).json({ message: "Username already in use" });
   }
   
   // Hash password before saving
   const hashedPassword = await bcryptjs.hash(password, parseInt(process.env.SALT_ROUNDS));
   
-  const user = new User({ username, email, password: hashedPassword, userAvatar: "" });
+  const user = new User({ name, username, email, password: hashedPassword, userAvatar: "", bio: "" });
   await user.save();
   res.json({ message: "User created" });
 });
@@ -192,13 +209,66 @@ app.get("/me", authMiddleware, async (req, res) => {
   const userId = req.session.user.id;
   try {
     const user = await User.findById(userId);
+    const followersCount = await Follow.countDocuments({
+      followingId: userId,
+    });
+
+  const followingCount = await Follow.countDocuments({
+    followerId: userId,
+  });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json({ _id: user._id, username: user.username, email: user.email, userAvatar: user.userAvatar, likedPosts: user.likedPosts });
+    res.json({ _id: user._id, name: user.name, username: user.username, email: user.email, userAvatar: user.userAvatar, followersCount, followingCount, bio: user.bio, coverImage: user.coverImage, createdAt: user.createdAt });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }});
+
+app.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
+  const allowedFields = ["name", "bio", "username"];
+  const userId = req.session.user.id;
+
+  const updates = {};
+  for (let key of allowedFields) {
+    if (req.body[key] !== undefined) {
+      updates[key] = req.body[key];
+    }
+  }
+
+  // Handle uploaded media
+  if (req.body.uploadedMedia) {
+    if (req.body.uploadedMedia.userAvatar) {
+      updates.userAvatar = req.body.uploadedMedia.userAvatar.url;
+    }
+    if (req.body.uploadedMedia.coverImage) {
+      updates.coverImage = req.body.uploadedMedia.coverImage.url;
+    }
+  }
+
+  if(updates.username) {
+    const existingUser = await User.findOne({ username: updates.username });
+    if (existingUser && existingUser._id.toString() !== userId) {
+      return res.status(400).json({ message: "Username already in use" });
+    }
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $set: updates },
+    { new: true },
+  ).select("-password");
+
+  res.json(user);
+});
+
+// Logout route to destroy session
+app.post("/logout", authMiddleware, (req, res) => {
+  req.session.destroy((err) => {
+    if (err) return res.status(500).json({ error: "Failed to logout" });
+    res.clearCookie("connect.sid");
+    res.json({ message: "Logged out" });
+  });
+});
 
 app.listen(3001, () => {
   console.log("Server running on port 3001");
