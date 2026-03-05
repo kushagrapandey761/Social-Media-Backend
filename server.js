@@ -8,6 +8,7 @@ const uploadMedia = require("./middleware/upload.middleware");
 const { uploadProfileMedia } = require("./middleware/upload.middleware");
 const { User, Post, Follow } = require("./db");
 const cors = require("cors");
+const cloudinary = require("cloudinary").v2;
 
 const app = express();
 
@@ -260,6 +261,32 @@ app.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
 
   res.json(user);
 });
+
+app.delete("/post/:postid", authMiddleware, async (req, res) => {
+  const postId = req.params.postid;
+  const userId = req.session.user.id;
+  try {
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    if (post.authorId.toString() !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+    post.media.forEach((media) => {
+      cloudinary.api.delete_resources(
+        [media.publicId],
+        { resource_type: media.type },
+        (error, result) => {
+          if (error) console.error("Cloudinary deletion error:", error);
+        },
+      );
+    });
+    await Post.findByIdAndDelete(postId);
+    res.json({ message: "Post deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }});
 
 // Logout route to destroy session
 app.post("/logout", authMiddleware, (req, res) => {
