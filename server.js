@@ -252,7 +252,38 @@ app.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
       return res.status(400).json({ message: "Username already in use" });
     }
   }
+  
+  if(updates.userAvatar) {
+    const user = await User.findById(userId);
+    let publicId = null;
+    if (user.userAvatar) {
+      publicId = user.userAvatar.split("/").slice(-1)[0].split(".")[0];
+      publicId = "userAvatar/" + publicId; // Assuming your folder in Cloudinary is named "userAvatar"
+    }
+    cloudinary.api.delete_resources(
+      [publicId],
+      { resource_type: "image" },
+      (error, result) => {
+        if (error) console.error("Cloudinary deletion error:", error);
+      },
+    );
+  }
 
+  if(updates.coverImage) {
+    const user = await User.findById(userId);
+    let publicId = null;
+    if (user.coverImage) {
+      publicId = user.coverImage.split("/").slice(-1)[0].split(".")[0];
+      publicId = "coverImage/" + publicId; // Assuming your folder in Cloudinary is named "coverImage"
+    }
+    cloudinary.api.delete_resources(
+      [publicId],
+      { resource_type: "image" },
+      (error, result) => {
+        if (error) console.error("Cloudinary deletion error:", error);
+      }
+    );
+  }
   const user = await User.findByIdAndUpdate(
     userId,
     { $set: updates },
