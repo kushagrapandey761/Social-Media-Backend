@@ -54,6 +54,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/users", authMiddleware, async (req, res) => {
+  const currentUserId = req.session.user.id;
   const users = await User.find({ _id: { $ne: currentUserId } });
 
   const following = await Follow.find({
@@ -251,6 +252,11 @@ app.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
     if (existingUser && existingUser._id.toString() !== userId) {
       return res.status(400).json({ message: "Username already in use" });
     }
+    const posts = await Post.find({ authorId: userId });
+    for (let post of posts) {
+      post.userName = updates.username;
+      await post.save();
+    }
   }
   
   if(updates.userAvatar) {
@@ -267,6 +273,11 @@ app.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
         if (error) console.error("Cloudinary deletion error:", error);
       },
     );
+    const posts = await Post.find({ authorId: userId });
+    for (let post of posts) {
+      post.userAvatar = updates.userAvatar;
+      await post.save();
+    }
   }
 
   if(updates.coverImage) {
@@ -318,6 +329,32 @@ app.delete("/post/:postid", authMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }});
+
+  app.post("/toggleFollow/:userid", authMiddleware, async (req, res) => {
+  const targetUserId = req.params.userid;
+  const currentUserId = req.session.user.id;
+  if (targetUserId === currentUserId) {
+    return res.status(400).json({ message: "Cannot follow yourself" });
+  }
+  try {
+    const existingFollow = await Follow.findOne({
+      followerId: currentUserId,
+      followingId: targetUserId,
+    });
+    if (existingFollow) {
+      await Follow.findByIdAndDelete(existingFollow._id);
+      return res.json({ message: "Unfollowed" });
+    }
+    const follow = new Follow({
+      followerId: currentUserId,
+      followingId: targetUserId,
+    });
+    await follow.save();
+    res.json({ message: "Followed" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Logout route to destroy session
 app.post("/logout", authMiddleware, (req, res) => {
