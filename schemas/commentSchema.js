@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const commentSchema = new mongoose.Schema({
   postId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -9,10 +10,14 @@ const commentSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  text: {
-    type: String,
-    required: true,
+  text: String,
+
+  parentCommentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Comment",
+    default: null,
   },
+
   createdAt: {
     type: Date,
     default: Date.now,
