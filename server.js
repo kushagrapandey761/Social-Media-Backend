@@ -359,7 +359,7 @@ app.delete("/post/:postid", authMiddleware, async (req, res) => {
 app.get("/comments/:postid", authMiddleware, async (req, res) => {
   const postId = req.params.postid;
   try {
-    const comments = await Comment.find({ postId })
+    const comments = await Comment.find({ postId, parentCommentId: null })
       .sort({ createdAt: -1 })
       .populate("authorId", "username userAvatar");
 
@@ -387,13 +387,17 @@ app.post("/comment/:postId", authMiddleware, async (req, res) => {
       text,
       parentCommentId: null,
     });
+    const populatedComment = await Comment.findById(comment._id).populate(
+      "authorId",
+      "username userAvatar",
+    );
     await Post.findByIdAndUpdate(postId, {
       $inc: { commentsCount: 1 },
     });
 
     res.status(201).json({
       message: "Comment added",
-      comment,
+      comment: populatedComment,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -418,8 +422,10 @@ app.post("/reply/:commentid", authMiddleware, async (req, res) => {
       text,
       parentCommentId: commentId,
     });
-
-    res.json({ message: "Reply added", reply });
+    parentComment.replyCount += 1;
+    await parentComment.save();
+    const populatedReply = await Comment.findById(reply._id).populate("authorId", "username userAvatar");
+    res.json({ message: "Reply added", reply: populatedReply });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

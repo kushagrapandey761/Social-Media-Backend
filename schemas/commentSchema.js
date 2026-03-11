@@ -18,6 +18,11 @@ const commentSchema = new mongoose.Schema({
     default: null,
   },
 
+  replyCount: {
+    type: Number,
+    default: 0,
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,
