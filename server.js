@@ -6,11 +6,17 @@ const { RedisStore } = require("connect-redis");
 const authMiddleware = require("./middleware/authMiddleware");
 const uploadMedia = require("./middleware/upload.middleware");
 const { uploadProfileMedia } = require("./middleware/upload.middleware");
-const { User, Post, Follow, Comment } = require("./db");
+const { User, Post, Follow, Comment, Message } = require("./db");
 const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
+const { getIO, initSocket, getOnlineUsers } = require("./socket");
+const http = require("http");
 
 const app = express();
+const server = http.createServer(app);
+
+
+initSocket(server);
 
 // allow larger JSON payloads (base64 images can be big)
 app.use(express.json({ limit: '10mb' }));
@@ -435,12 +441,32 @@ app.get("/replies/:commentid", authMiddleware, async (req, res) => {
   const commentId = req.params.commentid;
   try {
     const replies = await Comment.find({ parentCommentId: commentId })
-      .sort({ createdAt: -1 })
       .populate("authorId", "username userAvatar");
     res.json(replies);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.post("/sendMessage", authMiddleware, async (req, res) => {
+  const { receiverId, text } = req.body;
+  const senderId = req.session.user.id;
+
+  const message = await Message.create({
+    senderId,
+    receiverId,
+    text,
+  });
+
+  const onlineUsers = getOnlineUsers();
+  const receiverSocket = onlineUsers.get(receiverId);
+
+  if (receiverSocket) {
+    const io = getIO();
+    io.to(receiverSocket).emit("receiveMessage", message);
+  }
+
+  res.json(message);
 });
 
 // Logout route to destroy session
@@ -452,7 +478,7 @@ app.post("/logout", authMiddleware, (req, res) => {
   });
 });
 
-app.listen(3001, () => {
+server.listen(3001, () => {
   console.log("Server running on port 3001");
 });
 
