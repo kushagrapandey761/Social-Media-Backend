@@ -469,6 +469,22 @@ app.post("/sendMessage", authMiddleware, async (req, res) => {
   res.json(message);
 });
 
+app.get("/messages/:userId", authMiddleware, async (req, res) => {
+  const currentUserId = req.session.user.id;
+  const otherUserId = req.params.userId;
+  try {
+    const messages = await Message.find({
+      $or: [
+        { senderId: currentUserId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: currentUserId },
+      ],
+    }).sort({ createdAt: 1 });
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Logout route to destroy session
 app.post("/logout", authMiddleware, (req, res) => {
   req.session.destroy((err) => {

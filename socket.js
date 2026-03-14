@@ -14,17 +14,15 @@ function initSocket(server) {
   });
 
   io.on("connection", (socket) => {
-    console.log("Socket connected:", socket.id);
 
     // register user
     socket.on("register", (userId) => {
       onlineUsers.set(userId, socket.id);
-      console.log("User online:", userId);
+      io.emit("onlineUsers", Array.from(onlineUsers.keys()));
     });
 
     // disconnect
     socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
 
       for (const [userId, socketId] of onlineUsers.entries()) {
         if (socketId === socket.id) {
@@ -32,6 +30,7 @@ function initSocket(server) {
           break;
         }
       }
+      io.emit("onlineUsers", Array.from(onlineUsers.keys()));
     });
   });
 
