@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const { Message } = require("./db");
 
 let io;
 
@@ -19,6 +20,41 @@ function initSocket(server) {
     socket.on("register", (userId) => {
       onlineUsers.set(userId, socket.id);
       io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+    });
+
+    socket.on("typing", (data) => {
+      const receiverSocket = onlineUsers.get(data.receiverId);
+      if (receiverSocket) {
+        io.to(receiverSocket).emit("typing", {
+          senderId: data.senderId,
+          isTyping: true,
+        });
+      }
+    });
+
+    socket.on("stopTyping", (data) => {
+      const receiverSocket = onlineUsers.get(data.receiverId);
+      if (receiverSocket) {
+        io.to(receiverSocket).emit("stopTyping", {
+          senderId: data.senderId,
+          isTyping: false,
+        });
+      }
+    });
+
+    socket.on("messageSeen", async (data) => {
+      const receiverId = data.receiverId;
+      const senderId = data.senderId;
+      await Message.updateMany(
+        { senderId, receiverId, seen: false },
+        { $set: { seen: true, seenAt: new Date() } }
+      );
+      const senderSocket = onlineUsers.get(senderId);
+      if (senderSocket) {
+        io.to(senderSocket).emit("messageSeen", {
+          receiverId,
+        });
+      }
     });
 
     // disconnect

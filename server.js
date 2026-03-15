@@ -456,6 +456,7 @@ app.post("/sendMessage", authMiddleware, async (req, res) => {
     senderId,
     receiverId,
     text,
+    seen: false,
   });
 
   const onlineUsers = getOnlineUsers();
