@@ -16,17 +16,17 @@ function initSocket(server) {
 
   io.on("connection", (socket) => {
 
-    // register user
     socket.on("register", (userId) => {
       onlineUsers.set(userId, socket.id);
+      socket.userId = userId;
       io.emit("onlineUsers", Array.from(onlineUsers.keys()));
     });
 
     socket.on("typing", (data) => {
       const receiverSocket = onlineUsers.get(data.receiverId);
-      if (receiverSocket) {
+      if (receiverSocket && socket.userId) {
         io.to(receiverSocket).emit("typing", {
-          senderId: data.senderId,
+          senderId: socket.userId,
           isTyping: true,
         });
       }
@@ -34,26 +34,26 @@ function initSocket(server) {
 
     socket.on("stopTyping", (data) => {
       const receiverSocket = onlineUsers.get(data.receiverId);
-      if (receiverSocket) {
+      if (receiverSocket && socket.userId) {
         io.to(receiverSocket).emit("stopTyping", {
-          senderId: data.senderId,
+          senderId: socket.userId,
           isTyping: false,
         });
       }
     });
 
-    socket.on("messageSeen", async (data) => {
-      const receiverId = data.receiverId;
-      const senderId = data.senderId;
+    socket.on("messageSeen", async ({ senderId }) => {
+      const receiverId = socket.userId;
+      if (!receiverId) return;
+
       await Message.updateMany(
         { senderId, receiverId, seen: false },
         { $set: { seen: true, seenAt: new Date() } }
       );
+      
       const senderSocket = onlineUsers.get(senderId);
       if (senderSocket) {
-        io.to(senderSocket).emit("messageSeen", {
-          receiverId,
-        });
+        io.to(senderSocket).emit("messageSeen", { receiverId });
       }
     });
 
