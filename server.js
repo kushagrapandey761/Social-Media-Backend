@@ -11,6 +11,7 @@ const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 const { getIO, initSocket, getOnlineUsers } = require("./socket");
 const http = require("http");
+const mongoose = require("mongoose")
 
 const app = express();
 const server = http.createServer(app);
@@ -470,6 +471,38 @@ app.post("/sendMessage", authMiddleware, async (req, res) => {
   res.json(message);
 });
 
+app.get("/messages/lastMessages", async (req, res) => {
+  const currentUserId = req.session.user.id;
+  const userId = new mongoose.Types.ObjectId(currentUserId);
+  try {
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ senderId: userId }, { receiverId: userId }],
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$senderId", userId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+          lastMessage: { $first: "$$ROOT" },
+        },
+      },
+    ]);
+    res.json({ conversations });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/messages/:userId", authMiddleware, async (req, res) => {
   const currentUserId = req.session.user.id;
   const otherUserId = req.params.userId;
@@ -485,6 +518,35 @@ app.get("/messages/:userId", authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.get("/messages/unseen/count", authMiddleware, async (req, res) => {
+  const currentUserId = req.session.user.id;
+  try {
+    const count = await Message.countDocuments({
+      receiverId: currentUserId,
+      seen: false,
+    });
+
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/messages/unseen/users",authMiddleware,async (req,res)=>{
+  const currentUserId = req.session.user.id;
+  try{
+    const senderIds = await Message.find({
+      receiverId: currentUserId,
+      seen: false,
+    }).select("senderId");
+    res.json({ senderIds });
+  }catch(error){
+    res.status(500).json({ error: error.message });
+  }
+})
+
+
 
 // Logout route to destroy session
 app.post("/logout", authMiddleware, (req, res) => {

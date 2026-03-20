@@ -46,14 +46,25 @@ function initSocket(server) {
       const receiverId = socket.userId;
       if (!receiverId) return;
 
-      await Message.updateMany(
-        { senderId, receiverId, seen: false },
-        { $set: { seen: true, seenAt: new Date() } }
-      );
-      
-      const senderSocket = onlineUsers.get(senderId);
-      if (senderSocket) {
-        io.to(senderSocket).emit("messageSeen", { receiverId });
+      // Count how many we are about to update
+      const updateCount = await Message.countDocuments({ senderId, receiverId, seen: false });
+
+      if (updateCount > 0) {
+        await Message.updateMany(
+          { senderId, receiverId, seen: false },
+          { $set: { seen: true, seenAt: new Date() } }
+        );
+        
+        const senderSocket = onlineUsers.get(senderId);
+        if (senderSocket) {
+          io.to(senderSocket).emit("messageSeen", { receiverId });
+        }
+
+        // Notify the receiver (who just read the messages) so their Navbar can decrement the badge
+        const receiverSocket = onlineUsers.get(receiverId);
+        if (receiverSocket) {
+          io.to(receiverSocket).emit("messagesMarkedAsSeen", updateCount);
+        }
       }
     });
 
