@@ -9,6 +9,8 @@ const userSchema = new mongoose.Schema({
   bio: String,
   coverImage: String,
   createdAt: { type: Date, default: Date.now },
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
 });
 
 const User = mongoose.model("User", userSchema);

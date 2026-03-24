@@ -12,6 +12,8 @@ const cloudinary = require("cloudinary").v2;
 const { getIO, initSocket, getOnlineUsers } = require("./socket");
 const http = require("http");
 const mongoose = require("mongoose")
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +40,14 @@ app.use(
     credentials: true, // VERY IMPORTANT for sessions
   }),
 );
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: `${process.env.SENDER_EMAIL}`,
+    pass: `${process.env.SENDER_PASSWORD}`,
+  },
+});
 
 app.post("/login", async (req, res) => {
   const user = await User.findOne({ email: req.body.email });
@@ -545,6 +555,64 @@ app.get("/messages/unseen/users",authMiddleware,async (req,res)=>{
     res.status(500).json({ error: error.message });
   }
 })
+
+app.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  // Don't reveal if user exists (security)
+  if (!user) {
+    return res.json({ message: "If email exists, reset link sent" });
+  }
+
+  // Generate token
+  const token = crypto.randomBytes(32).toString("hex");
+
+  user.resetPasswordToken = token;
+  user.resetPasswordExpires = Date.now() + 1000 * 60 * 15; // 15 mins
+
+  await user.save();
+
+  const resetLink = `${process.env.FRONTEND_LINK}/${token}`;
+
+  await transporter.sendMail({
+    to: user.email,
+    subject: "Reset Password",
+    html: `<a href="${resetLink}">Reset Password</a>`,
+  });
+
+  res.json({ message: "Reset link sent" });
+});
+
+app.post("/reset-password/:token", async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({ message: "Invalid or expired token" });
+  }
+
+  const hashedPassword = await bcryptjs.hash(
+    password,
+    parseInt(process.env.SALT_ROUNDS),
+  );
+
+  user.password = hashedPassword;
+
+  // Clear token
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+
+  await user.save();
+
+  res.json({ message: "Password reset successful" });
+});
 
 
 
