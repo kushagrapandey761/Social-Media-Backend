@@ -460,25 +460,38 @@ app.get("/replies/:commentid", authMiddleware, async (req, res) => {
 });
 
 app.post("/sendMessage", authMiddleware, async (req, res) => {
-  const { receiverId, text } = req.body;
+  const { receiverId, text, postId, type, currentMediaIndex } = req.body;
   const senderId = req.session.user.id;
+
+  if ((!text && !postId) || (text && postId)) {
+    return res.status(400).json({
+      message: "Send either text or post, not both",
+    });
+  }
 
   const message = await Message.create({
     senderId,
     receiverId,
-    text,
+    text: text || "",
+    postId: postId || null,
+    type,
+    currentMediaIndex: currentMediaIndex !== undefined ? currentMediaIndex : null,
     seen: false,
   });
 
+  const populatedMessage = await Message.findById(message._id).populate({
+    path: "postId",
+    select: "content media userName userAvatar",
+  });
   const onlineUsers = getOnlineUsers();
   const receiverSocket = onlineUsers.get(receiverId);
 
   if (receiverSocket) {
     const io = getIO();
-    io.to(receiverSocket).emit("receiveMessage", message);
+    io.to(receiverSocket).emit("receiveMessage", populatedMessage);
   }
 
-  res.json(message);
+  res.json(populatedMessage);
 });
 
 app.get("/messages/lastMessages", async (req, res) => {
@@ -522,7 +535,7 @@ app.get("/messages/:userId", authMiddleware, async (req, res) => {
         { senderId: currentUserId, receiverId: otherUserId },
         { senderId: otherUserId, receiverId: currentUserId },
       ],
-    }).sort({ createdAt: 1 });
+    }).sort({ createdAt: 1 }).populate({path: "postId", select: "content media userName userAvatar"});
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -30,6 +30,23 @@ const messageSchema = new mongoose.Schema({
     type: Date,
   },
 
+  postId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Post",
+    default: null,
+  },
+
+  type: {
+    type: String,
+    enum: ["text", "post"],
+    required: true,
+  },
+
+  currentMediaIndex: {
+    type: Number,
+    default: null
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,
