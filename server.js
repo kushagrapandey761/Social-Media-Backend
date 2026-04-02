@@ -587,7 +587,7 @@ app.post("/forgot-password", async (req, res) => {
 
   await user.save();
 
-  const resetLink = `${process.env.FRONTEND_LINK}/${token}`;
+  const resetLink = `${process.env.FRONTEND_LINK}/reset-password/${token}`;
 
   await transporter.sendMail({
     to: user.email,
