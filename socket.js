@@ -9,7 +9,8 @@ const onlineUsers = new Map();
 function initSocket(server) {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:3000",
+      origin: process.env.FRONTEND_LINK,
+      methods: ["GET", "POST"],
       credentials: true,
     },
   });
