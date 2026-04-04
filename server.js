@@ -108,7 +108,7 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
 
     // 2️⃣ If not in Redis → Fetch from MongoDB
     console.log("Fetching from MongoDB");
-    const user = await User.findById(userId).select("-password"); // Exclude password
+    const user = await User.findById(userId).select("-password -email"); // Exclude password
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -117,7 +117,7 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
     // 3️⃣ Store in Redis (Expire in 60 seconds)
     await redisClient.setEx(`user:${userId}`, 60, JSON.stringify(user));
 
-    res.json({ _id: user._id, username: user.username, email: user.email, userAvatar: user.userAvatar });
+    res.json({ _id: user._id, username: user.username, userAvatar: user.userAvatar });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
