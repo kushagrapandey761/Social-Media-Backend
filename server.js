@@ -24,19 +24,25 @@ initSocket(server);
 // allow larger JSON payloads (base64 images can be big)
 app.use(express.json({ limit: '10mb' }));
 
+app.set("trust proxy", 1); // VERY IMPORTANT for Render (HTTPS proxy)
+
 app.use(
   session({
     store: new RedisStore({ client: redisClient }),
-    secret: "mySecretKey",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1800000 }, // 30 minute
+    cookie: {
+      httpOnly: true,
+      secure: true, // required for HTTPS (Render)
+      sameSite: "none", // required for cross-origin
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
   }),
 );
-
 app.use(
   cors({
-    origin: "http://localhost:3000", // frontend URL
+    origin: process.env.FRONTEND_LINK, // frontend URL
     credentials: true, // VERY IMPORTANT for sessions
   }),
 );
