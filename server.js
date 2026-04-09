@@ -123,7 +123,7 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
     });
 
     // 3️⃣ Store in Redis (Expire in 60 seconds)
-    const userData = { _id: user._id, username: user.username, userAvatar: user.userAvatar, followersCount, followingCount };
+    const userData = { _id: user._id, username: user.username, userAvatar: user.userAvatar, followersCount, followingCount, bio: user.bio };
     await redisClient.setEx(`user:${userId}`, 60, JSON.stringify(userData));
 
     res.json(userData);
