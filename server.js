@@ -114,10 +114,19 @@ app.get("/user/:id", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // 3️⃣ Store in Redis (Expire in 60 seconds)
-    await redisClient.setEx(`user:${userId}`, 60, JSON.stringify(user));
+    const followersCount = await Follow.countDocuments({
+      followingId: userId,
+    });
 
-    res.json({ _id: user._id, username: user.username, userAvatar: user.userAvatar });
+    const followingCount = await Follow.countDocuments({
+      followerId: userId,
+    });
+
+    // 3️⃣ Store in Redis (Expire in 60 seconds)
+    const userData = { _id: user._id, username: user.username, userAvatar: user.userAvatar, followersCount, followingCount };
+    await redisClient.setEx(`user:${userId}`, 60, JSON.stringify(userData));
+
+    res.json(userData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
