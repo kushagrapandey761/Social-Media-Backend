@@ -94,6 +94,72 @@ app.get("/users", authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+app.get("/chatUsers", authMiddleware, async (req, res) => {
+  const currentUserId = new mongoose.Types.ObjectId(req.session.user.id);
+
+  try {
+    const chatUsers = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $addFields: {
+          otherUserId: {
+            $cond: [
+              { $eq: ["$senderId", currentUserId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$otherUserId",
+          lastMessage: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          _id: 0,
+          user: {
+            _id: "$user._id",
+            username: "$user.username",
+            userAvatar: "$user.userAvatar",
+          },
+          lastMessage: {
+            _id: "$lastMessage._id",
+            senderId: "$lastMessage.senderId",
+            receiverId: "$lastMessage.receiverId",
+            text: "$lastMessage.text",
+            postId: "$lastMessage.postId",
+            type: "$lastMessage.type",
+            seen: "$lastMessage.seen",
+            createdAt: "$lastMessage.createdAt",
+          },
+        },
+      },
+      { $sort: { "lastMessage.createdAt": -1 } },
+    ]);
+
+    res.json(chatUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/user/:id", authMiddleware, async (req, res) => {
   const userId = req.params.id;
 
@@ -509,37 +575,6 @@ app.post("/sendMessage", authMiddleware, async (req, res) => {
   res.json(populatedMessage);
 });
 
-app.get("/messages/lastMessages", async (req, res) => {
-  const currentUserId = req.session.user.id;
-  const userId = new mongoose.Types.ObjectId(currentUserId);
-  try {
-    const conversations = await Message.aggregate([
-      {
-        $match: {
-          $or: [{ senderId: userId }, { receiverId: userId }],
-        },
-      },
-      {
-        $sort: { createdAt: -1 },
-      },
-      {
-        $group: {
-          _id: {
-            $cond: [
-              { $eq: ["$senderId", userId] },
-              "$receiverId",
-              "$senderId",
-            ],
-          },
-          lastMessage: { $first: "$$ROOT" },
-        },
-      },
-    ]);
-    res.json({ conversations });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 app.get("/messages/:userId", authMiddleware, async (req, res) => {
   const currentUserId = req.session.user.id;
