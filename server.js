@@ -14,6 +14,7 @@ const http = require("http");
 const mongoose = require("mongoose")
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const passport = require("./passport");
 
 const app = express();
 const server = http.createServer(app);
@@ -40,6 +41,10 @@ app.use(
     },
   }),
 );
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(
   cors({
     origin: process.env.FRONTEND_LINK, // frontend URL
@@ -687,6 +692,28 @@ app.post("/logout", authMiddleware, (req, res) => {
     res.json({ message: "Logged out" });
   });
 });
+
+app.get(
+  "/auth/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+  }),
+);
+
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+  }),
+  (req, res) => {
+    req.session.user = {
+      id: req.user._id,
+      username: req.user.username,
+    };
+
+    res.redirect(process.env.FRONTEND_LINK);
+  }
+);
 
 const PORT = process.env.PORT || 3001;
 
