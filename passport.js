@@ -15,8 +15,6 @@ passport.use(
           googleId: profile.id,
         });
 
-        console.log("Google profile:", user);
-
         // Create user if doesn't exist
         if (!user) {
           user = await User.create({
