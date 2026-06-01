@@ -17,6 +17,7 @@ const nodemailer = require("nodemailer");
 const passport = require("./passport");
 
 const app = express();
+app.set("trust proxy", 1); // VERY IMPORTANT for Render (HTTPS proxy)
 const server = http.createServer(app);
 
 
