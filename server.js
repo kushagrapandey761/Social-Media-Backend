@@ -712,7 +712,11 @@ app.get(
       username: req.user.username,
     };
 
-    res.redirect(process.env.FRONTEND_LINK);
+    // Explicitly save the session before redirecting to prevent race conditions
+    req.session.save((err) => {
+      if (err) console.error("Session save error:", err);
+      res.redirect(process.env.FRONTEND_LINK);
+    });
   }
 );
 
