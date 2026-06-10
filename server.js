@@ -225,9 +225,33 @@ app.post("/signup", async (req, res) => {
 
 app.get("/posts", authMiddleware, async (req, res) => {
   const userId = req.session.user.id;
-   // Only return posts not created by the user
-  const posts = await Post.find({ authorId: { $ne: userId } });
-  res.json(posts);
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
+  const skip = (page - 1) * limit;
+
+  try {
+    const posts = await Post.find({
+      authorId: { $ne: userId },
+    })
+      .sort({ createdAt: -1 }) // newest first
+      .skip(skip)
+      .limit(limit);
+
+    const totalPosts = await Post.countDocuments({
+      authorId: { $ne: userId },
+    });
+
+    res.json({
+      posts,
+      currentPage: page,
+      totalPages: Math.ceil(totalPosts / limit),
+      hasMore: skip + posts.length < totalPosts,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get("/posts/user/:userid", authMiddleware, async (req, res) => {
