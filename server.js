@@ -28,12 +28,21 @@ app.use(express.json({ limit: '10mb' }));
 
 app.set("trust proxy", 1); // VERY IMPORTANT for Render (HTTPS proxy)
 
+const corsOptions = {
+  origin: process.env.FRONTEND_LINK, // frontend URL
+  credentials: true, // VERY IMPORTANT for sessions
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
+
 app.use(
   session({
     store: new RedisStore({ client: redisClient }),
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: process.env.NODE_ENV === "production",
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // required for HTTPS (Render) (true for production, false for local)
@@ -45,13 +54,6 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.use(
-  cors({
-    origin: process.env.FRONTEND_LINK, // frontend URL
-    credentials: true, // VERY IMPORTANT for sessions
-  }),
-);
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
