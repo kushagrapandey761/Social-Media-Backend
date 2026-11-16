@@ -91,8 +91,12 @@ router.get("/chatUsers", authMiddleware, async (req, res) => {
   }
 });
 
-router.get("/user/:id", authMiddleware, async (req, res) => {
-  const userId = req.params.id;
+router.post("/user", authMiddleware, async (req, res) => {
+  const userId = req.body?.userId;
+
+  if (!userId) {
+    return res.status(400).json({ message: "Missing userId in request body", body: req.body, headers: req.headers });
+  }
 
   try {
     const cachedUser = await req.app.locals.redisClient.get(`user:${userId}`);
@@ -223,8 +227,8 @@ router.patch("/me", authMiddleware, uploadProfileMedia(), async (req, res) => {
   res.json(user);
 });
 
-router.post("/toggleFollow/:userid", authMiddleware, async (req, res) => {
-  const targetUserId = req.params.userid;
+router.post("/toggleFollow", authMiddleware, async (req, res) => {
+  const targetUserId = req.body?.userId;
   const currentUserId = req.session.user.id;
   if (targetUserId === currentUserId) {
     return res.status(400).json({ message: "Cannot follow yourself" });

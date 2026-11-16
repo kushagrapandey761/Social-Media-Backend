@@ -18,7 +18,8 @@ app.set("trust proxy", 1);
 const server = http.createServer(app);
 
 initSocket(server);
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "10mb", type: ['application/json', 'text/plain'] }));
+app.use(express.urlencoded({ extended: true }));
 
 const corsOptions = {
   origin: process.env.FRONTEND_LINK,

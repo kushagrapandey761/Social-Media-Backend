@@ -33,8 +33,8 @@ router.get("/posts", authMiddleware, async (req, res) => {
   }
 });
 
-router.get("/posts/user/:userid", authMiddleware, async (req, res) => {
-  const userId = req.params.userid;
+router.post("/userPosts", authMiddleware, async (req, res) => {
+  const userId = req.body.userId;
   try {
     const posts = await Post.find({ authorId: userId });
     res.json(posts);
@@ -43,8 +43,8 @@ router.get("/posts/user/:userid", authMiddleware, async (req, res) => {
   }
 });
 
-router.get("/post/:postid", authMiddleware, async (req, res) => {
-  const postId = req.params.postid;
+router.post("/getPost", authMiddleware, async (req, res) => {
+  const postId = req.body.postId;
   try {
     const post = await Post.findById(postId);
     if (!post) {
@@ -72,8 +72,8 @@ router.post("/post", authMiddleware, uploadMedia("files"), async (req, res) => {
   res.json({ post });
 });
 
-router.post("/post/:postid/toggleLike", authMiddleware, async (req, res) => {
-  const postId = req.params.postid;
+router.post("/post/toggleLike", authMiddleware, async (req, res) => {
+  const postId = req.body.postId;
   const userId = req.session.user.id;
   try {
     const post = await Post.findById(postId);
@@ -112,8 +112,8 @@ router.post("/post/:postid/comment", authMiddleware, async (req, res) => {
   }
 });
 
-router.delete("/post/:postid", authMiddleware, async (req, res) => {
-  const postId = req.params.postid;
+router.delete("/deletePost", authMiddleware, async (req, res) => {
+  const postId = req.body.postId;
   const userId = req.session.user.id;
   try {
     const post = await Post.findById(postId);

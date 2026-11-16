@@ -40,9 +40,9 @@ router.post("/sendMessage", authMiddleware, async (req, res) => {
   res.json(populatedMessage);
 });
 
-router.get("/messages/:userId", authMiddleware, async (req, res) => {
+router.post("/getUserMessages", authMiddleware, async (req, res) => {
   const currentUserId = req.session.user.id;
-  const otherUserId = req.params.userId;
+  const otherUserId = req.body.userId;
   try {
     const messages = await Message.find({
       $or: [

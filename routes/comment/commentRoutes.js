@@ -4,8 +4,8 @@ const { Comment, Post } = require("../../db");
 
 const router = express.Router();
 
-router.get("/comments/:postid", authMiddleware, async (req, res) => {
-  const postId = req.params.postid;
+router.post("/getComments", authMiddleware, async (req, res) => {
+  const postId = req.body.postId;
   try {
     const comments = await Comment.find({ postId, parentCommentId: null })
       .sort({ createdAt: -1 })
@@ -17,8 +17,8 @@ router.get("/comments/:postid", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/comment/:postId", authMiddleware, async (req, res) => {
-  const { postId } = req.params;
+router.post("/addComment", authMiddleware, async (req, res) => {
+  const { postId } = req.body;
   const { text } = req.body;
   const authorId = req.session.user.id;
 
@@ -52,8 +52,8 @@ router.post("/comment/:postId", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/reply/:commentid", authMiddleware, async (req, res) => {
-  const commentId = req.params.commentid;
+router.post("/addReply", authMiddleware, async (req, res) => {
+  const commentId = req.body.commentId;
   const { text } = req.body;
   const authorId = req.session.user.id;
 
@@ -79,8 +79,8 @@ router.post("/reply/:commentid", authMiddleware, async (req, res) => {
   }
 });
 
-router.get("/replies/:commentid", authMiddleware, async (req, res) => {
-  const commentId = req.params.commentid;
+router.post("/getReplies", authMiddleware, async (req, res) => {
+  const commentId = req.body.commentId;
   try {
     const replies = await Comment.find({ parentCommentId: commentId }).populate("authorId", "username userAvatar");
     res.json(replies);
