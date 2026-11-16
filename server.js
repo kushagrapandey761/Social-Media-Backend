@@ -7,6 +7,7 @@ const cors = require("cors");
 const http = require("http");
 const passport = require("./passport");
 const { initSocket } = require("./socket");
+const { getSessionCookieConfig } = require("./config/sessionConfig");
 const authRoutes = require("./routes/auth/authRoutes");
 const userRoutes = require("./routes/user/userRoutes");
 const postRoutes = require("./routes/post/postRoutes");
@@ -38,12 +39,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     proxy: process.env.NODE_ENV === "production",
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 1000 * 60 * 60 * 24,
-    },
+    cookie: getSessionCookieConfig(process.env),
   }),
 );
 
