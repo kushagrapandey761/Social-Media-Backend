@@ -2,7 +2,8 @@ const express = require("express");
 const cloudinary = require("cloudinary").v2;
 const authMiddleware = require("../../middleware/authMiddleware");
 const uploadMedia = require("../../middleware/upload.middleware");
-const { User, Post } = require("../../db");
+const { User, Post, Follow } = require("../../db");
+const { getIO, getOnlineUsers } = require("../../socket");
 
 const router = express.Router();
 
@@ -69,6 +70,18 @@ router.post("/post", authMiddleware, uploadMedia("files"), async (req, res) => {
     createdAt: new Date(),
   });
   await post.save();
+  // Emit the new post to the users that are following the author of the post
+  const followers = await Follow.find({ followingId: authorId }).select("followerId");
+  const io = getIO();
+  const onlineUsers = getOnlineUsers();
+
+  followers.forEach(({ followerId }) => {
+    const followerSocket = onlineUsers.get(followerId.toString());
+    if (followerSocket) {
+      io.to(followerSocket).emit("newPost", post);
+    }
+  });
+
   res.json({ post });
 });
 
